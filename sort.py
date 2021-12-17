@@ -96,7 +96,7 @@ class KalmanBoxTracker(object):
   This class represents the internal state of individual tracked objects observed as bbox.
   """
   count = 0
-  def __init__(self,bbox):
+  def __init__(self, bbox, class_id=None):
     """
     Initialises a tracker using initial bounding box.
     """
@@ -112,6 +112,7 @@ class KalmanBoxTracker(object):
     self.kf.Q[4:,4:] *= 0.01
 
     self.kf.x[:4] = convert_bbox_to_z(bbox)
+    self.class_id = class_id
     self.time_since_update = 0
     self.id = KalmanBoxTracker.count
     KalmanBoxTracker.count += 1
@@ -120,7 +121,7 @@ class KalmanBoxTracker(object):
     self.hit_streak = 0
     self.age = 0
 
-  def update(self,bbox):
+  def update(self, bbox, class_id=None):
     """
     Updates the state vector with observed bbox.
     """
@@ -129,6 +130,7 @@ class KalmanBoxTracker(object):
     self.hits += 1
     self.hit_streak += 1
     self.kf.update(convert_bbox_to_z(bbox))
+    self.class_id = class_id
 
   def predict(self):
     """
@@ -149,6 +151,9 @@ class KalmanBoxTracker(object):
     Returns the current bounding box estimate.
     """
     return convert_x_to_bbox(self.kf.x)
+
+  def get_class_id(self):
+    return self.class_id
 
 
 def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
@@ -197,7 +202,7 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
 
 
 class Sort(object):
-  def __init__(self, max_age=1, min_hits=3, iou_threshold=0.3):
+  def __init__(self, max_age=1, min_hits=3, iou_threshold=0.3, has_detection_category=False):
     """
     Sets key parameters for SORT
     """
@@ -206,16 +211,22 @@ class Sort(object):
     self.iou_threshold = iou_threshold
     self.trackers = []
     self.frame_count = 0
+    self.has_detection_category = has_detection_category
 
-  def update(self, dets=np.empty((0, 5))):
+  def update(self, dets=None):
     """
     Params:
-      dets - a numpy array of detections in the format [[x1,y1,x2,y2,score],[x1,y1,x2,y2,score],...]
-    Requires: this method must be called once for each frame even with empty detections (use np.empty((0, 5)) for frames without detections).
+      dets - a numpy array of detections in the format [[x1,y1,x2,y2,score, category_id],
+                                                        [x1,y1,x2,y2,score, category_id],
+                                                        ...] where category_id is optional
+    Requires: this method must be called once for each frame even with empty detections (use None for frames without detections).
     Returns the a similar array, where the last column is the object ID.
 
     NOTE: The number of objects returned may differ from the number of detections provided.
     """
+    if dets is None:
+      dets = np.empty((0, 5 + int(self.has_detection_category)))
+    assert dets.shape[1] == 5 + int(self.has_detection_category)
     self.frame_count += 1
     # get predicted locations from existing trackers.
     trks = np.zeros((len(self.trackers), 5))
@@ -229,28 +240,32 @@ class Sort(object):
     trks = np.ma.compress_rows(np.ma.masked_invalid(trks))
     for t in reversed(to_del):
       self.trackers.pop(t)
-    matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets,trks, self.iou_threshold)
+    matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets, trks, self.iou_threshold)
 
     # update matched trackers with assigned detections
     for m in matched:
-      self.trackers[m[1]].update(dets[m[0], :])
+      self.trackers[m[1]].update(dets[m[0], :], dets[m[0],5] if self.has_detection_category else None)
 
     # create and initialise new trackers for unmatched detections
     for i in unmatched_dets:
-        trk = KalmanBoxTracker(dets[i,:])
+        trk = KalmanBoxTracker(dets[i,:], dets[i,5] if self.has_detection_category else None)
         self.trackers.append(trk)
     i = len(self.trackers)
     for trk in reversed(self.trackers):
         d = trk.get_state()[0]
         if (trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
-          ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
+          if self.has_detection_category:
+            class_id = [trk.get_class_id()]
+          else:
+            class_id = []
+          ret.append(np.concatenate((d,[trk.id+1], class_id)).reshape(1,-1)) # +1 as MOT benchmark requires positive
         i -= 1
         # remove dead tracklet
         if(trk.time_since_update > self.max_age):
           self.trackers.pop(i)
     if(len(ret)>0):
       return np.concatenate(ret)
-    return np.empty((0,5))
+    return np.empty((0, 5 + int(self.has_detection_category)))
 
 def parse_args():
     """Parse input arguments."""
