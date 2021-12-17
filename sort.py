@@ -202,7 +202,7 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
 
 
 class Sort(object):
-  def __init__(self, max_age=1, min_hits=3, iou_threshold=0.3, has_detection_category=False):
+  def __init__(self, max_age=1, min_hits=3, iou_threshold=0.3):
     """
     Sets key parameters for SORT
     """
@@ -211,7 +211,6 @@ class Sort(object):
     self.iou_threshold = iou_threshold
     self.trackers = []
     self.frame_count = 0
-    self.has_detection_category = has_detection_category
 
   def update(self, dets=None):
     """
@@ -225,8 +224,7 @@ class Sort(object):
     NOTE: The number of objects returned may differ from the number of detections provided.
     """
     if dets is None:
-      dets = np.empty((0, 5 + int(self.has_detection_category)))
-    assert dets.shape[1] == 5 + int(self.has_detection_category)
+      dets = np.empty((0, 5))
     self.frame_count += 1
     # get predicted locations from existing trackers.
     trks = np.zeros((len(self.trackers), 5))
@@ -244,20 +242,21 @@ class Sort(object):
 
     # update matched trackers with assigned detections
     for m in matched:
-      self.trackers[m[1]].update(dets[m[0], :], dets[m[0],5] if self.has_detection_category else None)
+      self.trackers[m[1]].update(dets[m[0], :], dets[m[0],5] if dets.shape[1] == 6 else None)
 
     # create and initialise new trackers for unmatched detections
     for i in unmatched_dets:
-        trk = KalmanBoxTracker(dets[i,:], dets[i,5] if self.has_detection_category else None)
+        trk = KalmanBoxTracker(dets[i,:], dets[i,5] if dets.shape[1] == 6 else None)
         self.trackers.append(trk)
     i = len(self.trackers)
     for trk in reversed(self.trackers):
         d = trk.get_state()[0]
         if (trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
-          if self.has_detection_category:
-            class_id = [trk.get_class_id()]
+          class_id = trk.get_class_id()
+          if class_id is not None:
+            class_id = [class_id]
           else:
-            class_id = []
+            class_od = []
           ret.append(np.concatenate((d,[trk.id+1], class_id)).reshape(1,-1)) # +1 as MOT benchmark requires positive
         i -= 1
         # remove dead tracklet
@@ -265,7 +264,7 @@ class Sort(object):
           self.trackers.pop(i)
     if(len(ret)>0):
       return np.concatenate(ret)
-    return np.empty((0, 5 + int(self.has_detection_category)))
+    return np.empty((0, dets.shape[1]))
 
 def parse_args():
     """Parse input arguments."""
