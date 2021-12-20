@@ -1,3 +1,33 @@
+Changes to the upstream: optional passing of a detection category through the tracker.
+
+The category column of `tracker.update()` is simply passed through the tracker unchanged. 
+The tracker is not using the category data in any way. Useful when tracking multiple objects
+with similar categories with an imperfect detector. The object categories are then determined post hoc.
+
+```
+# input data: detections
+# {
+#    frame: array([[x1, y1, x2, y2, confidence, category],
+#                  [...]]),
+#    frame: ...
+# }
+      
+tracker = sort.Sort()
+sort_bboxes = {}
+
+for frame, bboxes in detections.items():
+    sort_bboxes[frame] = tracker.update(bboxes)
+
+# output: sort_bboxes
+# {
+#    frame: array([[x1, y1, x2, y2, track, category],
+#                  [...]]),
+#    frame: ...
+# }
+
+```
+
+
 SORT
 =====
 
