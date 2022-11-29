@@ -1,10 +1,14 @@
-Changes to the upstream: optional passing of a detection category through the tracker.
+Changes to the upstream: 
+- pass a detection category through the tracker,
+- installable as python package.
+
+**detection category passing**
 
 The category column of `tracker.update()` is simply passed through the tracker unchanged. 
 The tracker is not using the category data in any way. Useful when tracking multiple objects
 with similar categories with an imperfect detector. The object categories are then determined post hoc.
 
-```
+```python
 # input data: detections
 # {
 #    frame: array([[x1, y1, x2, y2, confidence, category],
@@ -27,6 +31,19 @@ for frame, bboxes in detections.items():
 
 ```
 
+**python package**
+
+```shell
+$ pip install https://github.com/smidm/sort
+```
+
+```python
+import sort
+tracker = sort.Sort()
+...
+```
+
+---
 
 SORT
 =====

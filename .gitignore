@@ -1,2 +1,4 @@
 output/
 mot_benchmark
+/.idea/
+/sort.egg-info/
