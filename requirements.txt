@@ -1,4 +1,4 @@
 filterpy
-lap @ git+https://github.com/gatagat/lap@new-packaging#egg=lap  # TODO: return to pypi version after release
+lapx
 numpy
 scipy

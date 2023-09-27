@@ -195,6 +195,13 @@ class Sort(object):
   def __init__(self, max_age=1, min_hits=3, iou_threshold=0.3):
     """
     Sets key parameters for SORT
+
+    :param max_age: Maximum number of frames to keep alive a track without associated detections.
+    :type max_age: int
+    :param min_hits: Minimum number of associated detections before track is initialised.
+    :type min_hits: int
+    :param iou_threshold: Minimum IOU for match.
+    :type iou_threshold: float
     """
     self.max_age = max_age
     self.min_hits = min_hits
