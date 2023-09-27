@@ -34,7 +34,7 @@ for frame, bboxes in detections.items():
 **python package**
 
 ```shell
-$ pip install https://github.com/smidm/sort
+$ pip install git+https://github.com/smidm/sort
 ```
 
 ```python
